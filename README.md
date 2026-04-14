@@ -1,2 +1,239 @@
 # Advanced-Machine-Learning
 The Customer Churn Prediction is a project based on machine learning models such as Logistic Regression, XGBoost, LightGBM, and CatBoost to forecast customer churn in the banking industry. 
+
+# **Import necessary libraries**
+"""
+
+!pip install catboost
+
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+import xgboost as xgb
+import lightgbm as lgb
+from catboost import CatBoostClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+
+"""# **Load the dataset**"""
+
+Customer_Churn = pd.read_csv('/content/Churn_Modelling.csv')
+
+"""# **Check the data info **"""
+
+data_info = Customer_Churn.info()
+print("Data Information:\n", data_info)
+
+"""# **Check for missing data**"""
+
+missing_data = Customer_Churn.isnull().sum()
+print("\nMissing Data:\n", missing_data)
+
+"""# **Check for duplicate data**"""
+
+duplicate_data = Customer_Churn.duplicated().sum()
+print("\nDuplicate Rows:\n", duplicate_data)
+
+"""# **Summary Statistics**"""
+
+#  Summary statistics for numerical features
+summary_statistics = Customer_Churn.describe()
+
+# Displaying the summary statistics for numerical features
+print("Summary Statistics for Numerical Features:")
+print(summary_statistics)
+
+"""# **Visualizing Data Distribution (Histograms)**"""
+
+# List of numerical columns to visualize
+numerical_columns = ['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts', 'EstimatedSalary']
+
+plt.figure(figsize=(15, 10))
+
+for i, column in enumerate(numerical_columns, 1):
+    plt.subplot(2, 3, i)  # 2 rows and 3 columns
+    sns.histplot(Customer_Churn[column], kde=True, color="skyblue", bins=30)
+    plt.title(f'Distribution of {column}')
+    plt.xlabel(column)
+    plt.ylabel('Frequency')
+
+plt.tight_layout()
+plt.show()
+
+"""# **Visualizing Categorical Data**"""
+
+#  Visualize categorical features using bar plots
+plt.figure(figsize=(12, 6))
+
+# Plotting 'Geography' distribution
+plt.subplot(1, 2, 1)
+sns.countplot(data=Customer_Churn, x='Geography', palette='viridis')
+plt.title('Distribution of Geography')
+plt.xlabel('Geography')
+plt.ylabel('Count')
+
+# Plotting 'Gender' distribution
+plt.subplot(1, 2, 2)
+sns.countplot(data=Customer_Churn, x='Gender', palette='magma')
+plt.title('Distribution of Gender')
+plt.xlabel('Gender')
+plt.ylabel('Count')
+
+plt.tight_layout()
+plt.show()
+
+"""# **Correlation Heatmap**"""
+
+# Correlation heatmap for numerical features
+plt.figure(figsize=(10, 8))
+correlation_matrix = Customer_Churn[numerical_columns].corr()
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', linewidths=0.5)
+plt.title('Correlation Matrix of Numerical Features')
+plt.show()
+
+"""# One-Hot Encoding for categorical features"""
+
+column_transformer = ColumnTransformer(
+    transformers=[
+        ('geo_gender', OneHotEncoder(), ['Geography', 'Gender']),  # One-hot encoding
+        ('scaler', StandardScaler(), ['CreditScore', 'Age', 'Tenure', 'Balance', 'NumOfProducts', 'EstimatedSalary'])  # Scaling numerical features
+    ],
+    remainder='passthrough'  # Leave other columns (such as 'RowNumber', 'CustomerId', 'Surname', 'Exited') as they are
+)
+
+"""# **Split the data into features (X) and target (y)**"""
+
+X = Customer_Churn.drop(columns=['Exited', 'RowNumber', 'CustomerId', 'Surname'])  # Drop non-feature columns
+y = Customer_Churn['Exited']  # 'Exited' is the target variable
+
+"""# **Split the dataset into training and test sets (80% train, 20% test)**"""
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+"""# **Create a pipeline to apply transformations and train a model**"""
+
+pipeline = Pipeline(steps=[
+    ('preprocessor', column_transformer)  # Apply the column transformer to the features
+])
+
+# Fit and transform the training data
+X_train_processed = pipeline.fit_transform(X_train)
+X_test_processed = pipeline.transform(X_test)
+
+print("Processed training data shape:", X_train_processed.shape)
+print("Processed test data shape:", X_test_processed.shape)
+
+"""# **Train and Evaluate Models**
+
+# **Logistic Regression**
+"""
+
+log_reg = LogisticRegression(max_iter=1000, random_state=42)
+log_reg.fit(X_train_processed, y_train)
+
+log_reg_pred = log_reg.predict(X_test_processed)
+
+"""# **XGBoost**"""
+
+xgb_model = xgb.XGBClassifier(random_state=42)
+xgb_model.fit(X_train_processed, y_train)
+
+xgb_pred = xgb_model.predict(X_test_processed)
+
+"""# **LightGBM**"""
+
+lgb_model = lgb.LGBMClassifier(random_state=42)
+lgb_model.fit(X_train_processed, y_train)
+
+lgb_pred = lgb_model.predict(X_test_processed)
+
+"""# **CatBoost**"""
+
+catboost_model = CatBoostClassifier(iterations=1000, learning_rate=0.1, depth=6, verbose=0, random_state=42)
+catboost_model.fit(X_train_processed, y_train)
+
+catboost_pred = catboost_model.predict(X_test_processed)
+
+"""# *Evaluate the models*"""
+
+models = {
+    "Logistic Regression": log_reg_pred,
+    "XGBoost": xgb_pred,
+    "LightGBM": lgb_pred,
+    "CatBoost": catboost_pred
+}
+
+# Function to display performance metrics
+def evaluate_model(predictions, model_name):
+    accuracy = accuracy_score(y_test, predictions)
+    roc_auc = roc_auc_score(y_test, predictions)
+    class_report = classification_report(y_test, predictions)
+    print(f"Evaluation for {model_name}:")
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"ROC AUC: {roc_auc:.4f}")
+    print(f"Classification Report:\n{class_report}\n")
+
+# Evaluate all models
+for model_name, predictions in models.items():
+    evaluate_model(predictions, model_name)
+
+# Function to plot confusion matrix
+def plot_confusion_matrix(y_true, y_pred, model_name):
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Not Exited', 'Exited'], yticklabels=['Not Exited', 'Exited'])
+    plt.title(f'Confusion Matrix for {model_name}')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.show()
+
+# Function to plot ROC curve
+def plot_roc_curve(y_true, y_pred_prob, model_name):
+    fpr, tpr, _ = roc_curve(y_true, y_pred_prob)
+    roc_auc = auc(fpr, tpr)
+    plt.figure(figsize=(6, 5))
+    plt.plot(fpr, tpr, color='blue', label=f'{model_name} ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+    plt.title(f'ROC Curve for {model_name}')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.legend(loc='lower right')
+    plt.show()
+
+# Function to plot error plot (misclassification rate)
+def plot_error_plot(y_true, y_pred, model_name):
+    errors = y_true != y_pred
+    error_rate = errors.mean()
+    plt.figure(figsize=(6, 5))
+    plt.bar([model_name], [error_rate], color='red')
+    plt.ylabel('Error Rate')
+    plt.title(f'Error Rate for {model_name}')
+    plt.ylim(0, 1)
+    plt.show()
+
+# Function to plot a model comparison summary table
+def plot_model_comparison_summary():
+    data = {
+        'Model': ['Logistic Regression', 'XGBoost', 'LightGBM', 'CatBoost'],
+        'Accuracy': [accuracy_score(y_test, log_reg_pred), accuracy_score(y_test, xgb_pred),
+                     accuracy_score(y_test, lgb_pred), accuracy_score(y_test, catboost_pred)],
+        'ROC AUC': [roc_auc_score(y_test, log_reg_pred), roc_auc_score(y_test, xgb_pred),
+                    roc_auc_score(y_test, lgb_pred), roc_auc_score(y_test, catboost_pred)],
+    }
+    comparison_df = pd.DataFrame(data)
+    print("Model Comparison Summary:")
+    print(comparison_df)
+
+# Evaluate and visualize for each model
+for model_name, predictions in models.items():
+    plot_confusion_matrix(y_test, predictions, model_name)
+    plot_roc_curve(y_test, predictions, model_name)
+    plot_error_plot(y_test, predictions, model_name)
+
+# Plot model comparison summary
+plot_model_comparison_summary()
