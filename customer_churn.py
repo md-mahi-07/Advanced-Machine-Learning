@@ -9,7 +9,7 @@ Original file is located at
 # **Import necessary libraries**
 """
 
-!pip install catboost
+pip install catboost
 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
